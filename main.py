@@ -1,27 +1,47 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Header, HTTPException
 from pydantic import BaseModel
 import time
 
 app = FastAPI(title="Agentic Honeypot API")
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+API_KEY = "guvi-secret-123"  # you can change this
 
-@app.post("/login")
-async def login(data: LoginRequest, request: Request):
+class HoneypotRequest(BaseModel):
+    message: str | None = None
+
+@app.get("/")
+def health():
+    return {"status": "alive"}
+
+@app.post("/honeypot")
+async def honeypot(
+    request: Request,
+    data: HoneypotRequest,
+    x_api_key: str = Header(None)
+):
+    # Auth check
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
     client_ip = request.client.host
     user_agent = request.headers.get("user-agent")
 
-    time.sleep(2)
+    time.sleep(1)
 
-    print("HONEYPOT HIT:", {
+    log = {
         "ip": client_ip,
-        "username": data.username,
-        "agent": user_agent
-    })
+        "agent": user_agent,
+        "message": data.message
+    }
+
+    print("HONEYPOT HIT:", log)
 
     return {
-        "status": "success",
-        "token": "fake-jwt-token"
+        "scam_detected": True,
+        "extracted_entities": {
+            "upi_id": "scammer@upi",
+            "phone": "9876543210",
+            "phishing_url": "http://fake-bank-login.com"
+        },
+        "confidence": 0.91
     }
